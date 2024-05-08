@@ -1,0 +1,128 @@
+/* 
+   1 - GND
+   2 - VCC 3.3V !!! NOT 5V
+   3 - CE to Arduino pin 7
+   4 - CSN to Arduino pin 8
+   5 - SCK to Arduino pin 13
+   6 - MOSI to Arduino pin 11
+   7 - MISO to Arduino pin 12
+   8 - UNUSED
+   */
+
+#include <SPI.h>   // Comes with Arduino IDE
+#include "RF24.h"  // Download and Install (See above)
+#include <Servo.h>
+#include <SoftwareSerial.h> // Allows print
+
+// (Create an instance of a radio, specifying the CE and CS pins. )
+RF24 myRadio (9,10); // "myRadio" is the identifier you will use in following methods
+byte addresses[][6] = {"Node1"}; // Create address for 1 pipe.
+double joystickValue;  // Data that will be received from the transmitter
+int moveArmUp; // 1 = up, -1 = down, 0 = nothing 
+
+
+int servo1_pin = 3;
+int servo2_pin = 5;
+int angle = 0;
+int pos1 = 0;
+int pos2 = 0;
+
+int upperbound1 = 120; 
+int lowerbound1 = 42; 
+
+int upperbound2 = 148; 
+int lowerbound2 = 70; 
+
+// Start at the arm's lowered position 
+// The modification is to ensure that it is only within the range of the arm going up -- fix this model 
+int initial_position1 = lowerbound1 - 2;
+int initial_position2 = upperbound2 + 2;
+Servo servo1;
+Servo servo2;
+int x_key = A1;
+int y_key = A0;
+
+
+//const int buttonUpPin = 2;  // Button for moving the arm up
+//const int buttonDownPin = 3;  // Button for moving the arm down
+
+
+void setup()
+{
+  Serial.begin(9600);
+  delay(1000);
+
+
+  myRadio.begin();  // Start up the physical nRF24L01 Radio
+  myRadio.setChannel(108);  // Above most Wifi Channels
+  myRadio.setPALevel(RF24_PA_MIN);
+  myRadio.openReadingPipe(1, addresses[0]); // Use the first entry in array 'addresses' (Only 1 right now)
+  myRadio.startListening();
+
+  servo1.attach (servo1_pin ) ;
+  servo1.write (initial_position1);
+
+  servo2.attach (servo2_pin ) ;
+  servo2.write (initial_position2); 
+
+  // Set button pins as inputs
+  //pinMode(buttonUpPin, INPUT_PULLUP);
+  //pinMode(buttonDownPin, INPUT_PULLUP);
+
+}
+
+void loop()
+{
+  if ( myRadio.available()) // Check for incoming data from transmitter
+  {
+    while (myRadio.available())  // While there is data ready
+    {
+      //myRadio.read( &joystickValue, sizeof(joystickValue) ); // Get the data payload (You must have defined that already!)
+      myRadio.read( &moveArmUp, sizeof(moveArmUp) ); // Get the data payload (You must have defined that already!)
+
+    }
+     Serial.print(millis());
+     Serial.print("    ");
+     Serial.println(moveArmUp);
+  }
+
+  // lowering the arm 
+  if (moveArmUp == 2) {
+    if (initial_position1 >= lowerbound1 && initial_position1 <= upperbound1 && initial_position2 >= lowerbound2 && initial_position2 <= upperbound2)
+    {
+      initial_position1 = initial_position1 - 5;
+      Serial.print("joystick value is going up! servo1 is going down");
+      Serial.println(initial_position1);
+      servo1.write (initial_position1);
+
+      initial_position2 = initial_position2 + 5;
+      servo2.write (initial_position2);
+    }
+    else {
+      Serial.println("hello: joystick value is increasing but you are out of bounds");
+      Serial.println(initial_position1);
+    }
+  }
+
+  // lifting up the arm 
+  if (moveArmUp == 1) {
+    Serial.println("receiving 1");
+    Serial.println(initial_position1);
+    Serial.println(lowerbound1-2); 
+    Serial.println(upperbound1-2); 
+    if (initial_position1 >= (lowerbound1-2) && initial_position1 <= (upperbound1-2) && initial_position2 >= (lowerbound2+2) && initial_position2 <= (upperbound2+2))
+    {
+      Serial.println("moving 1");
+      initial_position1 = initial_position1 + 5;
+      servo1.write (initial_position1);
+      Serial.print(initial_position1); 
+  
+      initial_position2 = initial_position2 - 5;
+      servo2.write (initial_position2);
+    }
+  }
+
+  delay(100);
+  
+  
+  }
